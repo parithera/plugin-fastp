@@ -1,6 +1,6 @@
 services:
   plugin-fastp:
-    # platform: linux/amd64
+    platform: linux/amd64
     build:
       context: ../../backend
       dockerfile: plugins/fastp/.cloud/docker/Dockerfile
