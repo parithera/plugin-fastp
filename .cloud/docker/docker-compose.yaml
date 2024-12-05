@@ -1,0 +1,30 @@
+services:
+  plugin-fastp:
+    # platform: linux/amd64
+    build:
+      context: ../../backend
+      dockerfile: plugins/fastp/.cloud/docker/Dockerfile
+      target: plugin-dev
+      args:
+        - PLUGINNAME=fastp
+    image: parithera/fastp-dev:latest
+    restart: always
+    volumes:
+      - ../../backend:/codeclarity
+      - ../../private:/private
+      - ../../backend/plugins/fastp/tests/fastq:/input
+      - ../../backend/plugins/fastp/tests/output:/output
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_started
+      pg_bouncer:
+        condition: service_started
+      adminer:
+        condition: service_started
+    env_file:
+      - ../../.cloud/env/.env.dev
+
+volumes:
+  projects:
