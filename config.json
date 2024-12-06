@@ -5,5 +5,12 @@
   "image_version": "0.0.0",
   "depends_on": [],
   "description": "A plugin to run an R script",
-  "config": {}
+  "config": {
+    "platform": {
+      "name": "platform",
+      "type": "string",
+      "description": "hydrop, 10x",
+      "required": false
+    }
+  }
 }

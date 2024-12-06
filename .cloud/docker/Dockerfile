@@ -21,22 +21,19 @@ RUN go install github.com/air-verse/air@latest
 CMD air -c .air.toml
 
 # DEBUG IMAGE
-FROM golang:1.23.0-alpine AS plugin-debug
+FROM golang:1.23.0 AS plugin-debug
 ARG KIND
 ARG PLUGINNAME
 ENV KIND ${KIND}
 ENV PLUGINNAME ${PLUGINNAME}
 
 WORKDIR /
-RUN wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip
-RUN unzip fastqc_v0.12.1.zip
-RUN rm fastqc_v0.12.1.zip
-RUN ln -s /FastQC/fastqc /usr/local/bin/fastqc
+RUN wget http://opengene.org/fastp/fastp
+RUN chmod a+x ./fastp
+RUN cp ./fastp /usr/local/bin/fastp
 
 WORKDIR /codeclarity/${KIND}/${PLUGINNAME}
 ADD .cloud/docker/config/* /root
-RUN apk add --no-cache git msttcorefonts-installer fontconfig openjdk21-jre perl
-RUN update-ms-fonts
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 ADD .cloud/docker/config/* /root
@@ -46,7 +43,7 @@ CMD /go/bin/dlv debug . --headless --listen=:40000 --accept-multiclient
 
 
 # BUILD IMAGE
-FROM golang:1.23.0-alpine AS plugin-build
+FROM golang:1.23.0 AS plugin-build
 ARG KIND
 ARG PLUGINNAME
 COPY . /codeclarity/${KIND}/${PLUGINNAME}

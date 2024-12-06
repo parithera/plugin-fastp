@@ -26,8 +26,8 @@ func TestCreateNPMv1(t *testing.T) {
 	db_codeclarity := bun.NewDB(sqldb, pgdialect.New())
 	defer db_codeclarity.Close()
 
-	sourceCodeDir := "/Users/cedric/Documents/workspace/parithera-dev/private/20e14aae-b8ca-4fad-a351-6d747b9ab070/67e09357-aefb-44a2-a978-1c508e16eb23"
-	out := plugin.Start(sourceCodeDir, db_codeclarity)
+	sourceCodeDir := "/home/cedric/Documents/workspace/parithera-dev/private/bef81cdc-a99f-4856-bde5-7b2ee1968819/f804b115-6eb7-4a41-8476-a239cb744f4e"
+	out := plugin.Start(sourceCodeDir, db_codeclarity, "10x")
 
 	// Assert the expected values
 	assert.NotNil(t, out)

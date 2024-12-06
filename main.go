@@ -89,7 +89,7 @@ func startAnalysis(args Arguments, dispatcherMessage types_amqp.DispatcherPlugin
 	project := filepath.Join(path, messageData["user"].(string), messageData["project"].(string))
 
 	// Start the plugin
-	rOutput := plugin.Start(project, args.codeclarity)
+	rOutput := plugin.Start(project, args.codeclarity, messageData["platform"].(string))
 
 	result := codeclarity.Result{
 		Result:     rOutput,
