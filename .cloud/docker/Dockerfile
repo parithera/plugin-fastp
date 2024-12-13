@@ -50,17 +50,29 @@ COPY . /codeclarity/${KIND}/${PLUGINNAME}
 WORKDIR /codeclarity/${KIND}/${PLUGINNAME}
 ADD .cloud/docker/config/* /root
 RUN rm go.work
-RUN apk update && apk upgrade --no-cache
-RUN apk add git
+RUN apt update && apt upgrade -y
+RUN apt install -y git
 RUN [ "go", "build", "-o", "plugin" ]
 
 # PRODUCTION IMAGE
-FROM alpine:3.20.2 AS plugin
+FROM debian:bookworm AS plugin
 ARG KIND
 ARG USERNAME
 ARG PLUGINNAME
-RUN adduser -D ${USERNAME}
+
+RUN apt update && apt upgrade -y
+RUN apt install -y wget
+RUN wget http://opengene.org/fastp/fastp
+RUN chmod a+x ./fastp
+RUN cp ./fastp /usr/local/bin/fastp
+# Clean cache
+RUN apt-get clean
+RUN rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 1001 ${USERNAME}
+RUN adduser --uid 1001 -gid 1001 ${USERNAME}
 USER ${USERNAME}
+
 WORKDIR /home/${USERNAME}/${PLUGINNAME}
 COPY --from=plugin-build --chown=codeclarity:codeclarity /codeclarity/${KIND}/${PLUGINNAME}/plugin .
 COPY --from=plugin-build --chown=codeclarity:codeclarity /codeclarity/${KIND}/${PLUGINNAME}/config.json .
