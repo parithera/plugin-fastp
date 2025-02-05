@@ -86,10 +86,10 @@ func startAnalysis(args Arguments, dispatcherMessage types_amqp.DispatcherPlugin
 	// Destination folder
 	// destination := fmt.Sprintf("%s/%s/%s", path, organization, analysis.Commit)
 	// Prepare the arguments for the plugin
-	project := filepath.Join(path, messageData["user"].(string), messageData["project"].(string))
+	sample := filepath.Join(path, dispatcherMessage.OrganizationId.String(), "samples", messageData["sample"].(string))
 
 	// Start the plugin
-	rOutput := plugin.Start(project, args.codeclarity, messageData["platform"].(string))
+	rOutput := plugin.Start(sample, args.codeclarity, messageData["platform"].(string))
 
 	result := codeclarity.Result{
 		Result:     rOutput,
