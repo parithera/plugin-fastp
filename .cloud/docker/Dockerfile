@@ -5,7 +5,7 @@ ARG USERNAME=codeclarity
 ARG PLUGINNAME=plugin
 
 # DEV IMAGE
-FROM golang:1.23.0 AS plugin-dev
+FROM golang:1.24.0 AS plugin-dev
 ARG KIND
 ARG PLUGINNAME
 
@@ -21,7 +21,7 @@ RUN go install github.com/air-verse/air@latest
 CMD air -c .air.toml
 
 # DEBUG IMAGE
-FROM golang:1.23.0 AS plugin-debug
+FROM golang:1.24.0 AS plugin-debug
 ARG KIND
 ARG PLUGINNAME
 ENV KIND ${KIND}
@@ -43,7 +43,7 @@ CMD /go/bin/dlv debug . --headless --listen=:40000 --accept-multiclient
 
 
 # BUILD IMAGE
-FROM golang:1.23.0 AS plugin-build
+FROM golang:1.24.0 AS plugin-build
 ARG KIND
 ARG PLUGINNAME
 COPY . /codeclarity/${KIND}/${PLUGINNAME}
@@ -55,7 +55,7 @@ RUN apt install -y git
 RUN [ "go", "build", "-o", "plugin" ]
 
 # PRODUCTION IMAGE
-FROM debian:bookworm AS plugin
+FROM debian:12.9-slim AS plugin
 ARG KIND
 ARG USERNAME
 ARG PLUGINNAME
@@ -65,6 +65,7 @@ RUN apt install -y wget
 RUN wget http://opengene.org/fastp/fastp
 RUN chmod a+x ./fastp
 RUN cp ./fastp /usr/local/bin/fastp
+
 # Clean cache
 RUN apt-get clean
 RUN rm -rf /var/lib/apt/lists/*
