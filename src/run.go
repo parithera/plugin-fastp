@@ -1,4 +1,4 @@
-package js
+package fastp
 
 import (
 	"log"
@@ -17,66 +17,71 @@ import (
 	"github.com/parithera/plugin-fastp/src/utils/output_generator"
 )
 
-// Start is a function that analyzes the source code directory and generates a software bill of materials (SBOM) output.
+// Start analyzes the source code directory and generates a software bill of materials (SBOM) output.
 // It returns an sbomTypes.Output struct containing the analysis results.
 func Start(sourceCodeDir string, codeclarityDB *bun.DB, platform string) types.Output {
-
 	return ExecuteScript(sourceCodeDir, platform)
-
 }
 
+// ExecuteScript performs the Fastp analysis on the provided data.
 func ExecuteScript(sourceCodeDir string, platform string) types.Output {
-	start := time.Now()
+	startTime := time.Now()
 
+	// Find fastq files matching the pattern "*R1*.fastq.gz".
 	files, err := filepath.Glob(sourceCodeDir + "/*R1*.fastq.gz")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// If no fastq files are found, return a specific output.
 	if len(files) == 0 {
-		return generate_output(start, "no fastq file", codeclarity.SUCCESS, []exceptionManager.Error{})
+		return generate_output(startTime, "no fastq file", codeclarity.SUCCESS, []exceptionManager.Error{})
 	}
+
+	// Create the output directory for Fastp results.
 	outputPath := path.Join(sourceCodeDir, "fastp")
 	os.MkdirAll(outputPath, os.ModePerm)
 
-	// We retrieves the pairs of R1 and R2
-	var groups [][]string
-	for _, r1 := range files {
-		var couple []string
-		// With 10x r1 and r2 are switched
+	// Prepare the pairs of R1 and R2 files for analysis.
+	var filePairs [][]string
+	for _, r1File := range files {
+		var pair []string
+		// Handle 10x Genomics data where R1 and R2 are switched.
 		if platform == "10x" {
-			couple = append(couple, strings.ReplaceAll(r1, "R1", "R2"), r1)
+			pair = append(pair, strings.ReplaceAll(r1File, "R1", "R2"), r1File)
 		} else {
-			couple = append(couple, r1, strings.ReplaceAll(r1, "R1", "R2"))
+			pair = append(pair, r1File, strings.ReplaceAll(r1File, "R1", "R2"))
 		}
-		groups = append(groups, couple)
+		filePairs = append(filePairs, pair)
 	}
 
-	// We run fastp on each pair
-	for _, group := range groups {
-		// ./bin/fastp -i $first -I $second -h $outputdir/fastp/$output_name.html -j $outputdir/fastp/$output_name.json -w 8
-		output_name := strings.ReplaceAll(group[0], sourceCodeDir+"/", "")
-		output_name = strings.ReplaceAll(output_name, ".fastq.gz", "")
+	// Iterate through the file pairs and run Fastp on each.
+	for _, pair := range filePairs {
+		// Construct the output name based on the R1 file.
+		outputName := strings.ReplaceAll(pair[0], sourceCodeDir+"/", "")
+		outputName = strings.ReplaceAll(outputName, ".fastq.gz", "")
+
+		// Define the arguments for the Fastp command.
 		args := append(
 			[]string{
 				"-i",
-				group[0],
+				pair[0],
 				"-I",
-				group[1],
+				pair[1],
 				"-h",
-				path.Join(outputPath, output_name+".html"),
+				path.Join(outputPath, outputName+".html"),
 				"-j",
-				path.Join(outputPath, output_name+".json"),
+				path.Join(outputPath, outputName+".json"),
 				"-w",
 				"8",
-			}, group...)
+			}, pair...)
 
-		// Run Rscript in sourceCodeDir
+		// Execute the Fastp command.
 		cmd := exec.Command("fastp", args...)
 		_, err = cmd.CombinedOutput()
 		if err != nil {
-			// panic(fmt.Sprintf("Failed to run Rscript: %s", err.Error()))
-			codeclarity_error := exceptionManager.Error{
+			// Handle errors during Fastp execution.
+			codeclarityError := exceptionManager.Error{
 				Private: exceptionManager.ErrorContent{
 					Description: err.Error(),
 					Type:        exceptionManager.GENERIC_ERROR,
@@ -86,15 +91,17 @@ func ExecuteScript(sourceCodeDir string, platform string) types.Output {
 					Type:        exceptionManager.GENERIC_ERROR,
 				},
 			}
-			return generate_output(start, nil, codeclarity.FAILURE, []exceptionManager.Error{codeclarity_error})
+			return generate_output(startTime, nil, codeclarity.FAILURE, []exceptionManager.Error{codeclarityError})
 		}
 	}
 
-	return generate_output(start, "done", codeclarity.SUCCESS, []exceptionManager.Error{})
+	// Return a success output.
+	return generate_output(startTime, "done", codeclarity.SUCCESS, []exceptionManager.Error{})
 }
 
-func generate_output(start time.Time, data any, status codeclarity.AnalysisStatus, errors []exceptionManager.Error) types.Output {
-	formattedStart, formattedEnd, delta := output_generator.GetAnalysisTiming(start)
+// generate_output creates the final output struct with analysis results and timing information.
+func generate_output(startTime time.Time, data any, status codeclarity.AnalysisStatus, errors []exceptionManager.Error) types.Output {
+	formattedStart, formattedEnd, delta := output_generator.GetAnalysisTiming(startTime)
 
 	output := types.Output{
 		Result: types.Result{

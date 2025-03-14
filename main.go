@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,21 +20,22 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-// Define the arguments you want to pass to the callback function
+// Arguments encapsulates dependencies passed to the callback function.
 type Arguments struct {
 	codeclarity *bun.DB
 }
 
 // main is the entry point of the program.
-// It reads the configuration, initializes the necessary databases and graph,
-// and starts listening on the queue.
+// It reads the configuration, initializes the database connection,
+// and starts listening on the AMQP queue for analysis requests.
 func main() {
 	config, err := readConfig()
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("Error reading configuration: %v", err)
 		return
 	}
 
+	// Retrieve database connection parameters from environment variables.
 	host := os.Getenv("PG_DB_HOST")
 	if host == "" {
 		log.Printf("PG_DB_HOST is not set")
@@ -55,58 +57,66 @@ func main() {
 		return
 	}
 
-	dsn := "postgres://" + user + ":" + password + "@" + host + ":" + port + "/" + dbhelper.Config.Database.Results + "?sslmode=disable"
+	// Construct the database connection string.
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, password, host, port, dbhelper.Config.Database.Results)
+
+	// Initialize the database connection using Bun.
 	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn), pgdriver.WithTimeout(50*time.Second)))
 	db_codeclarity := bun.NewDB(sqldb, pgdialect.New())
 	defer db_codeclarity.Close()
 
+	// Create an instance of the Arguments struct to pass dependencies.
 	args := Arguments{
 		codeclarity: db_codeclarity,
 	}
 
-	// Start listening on the queue
+	// Start listening on the AMQP queue for analysis requests.
 	amqp_helper.Listen("dispatcher_"+config.Name, callback, args, config)
 }
 
-// startAnalysis is a function that performs the analysis of a project and generates an SBOM (Software Bill of Materials).
-// It takes the following parameters:
-// - args: Arguments for the analysis.
-// - dispatcherMessage: DispatcherPluginMessage containing information about the analysis.
-// - config: Plugin configuration.
-// - analysis_document: Analysis document containing the analysis configuration.
-// It returns a map[string]any containing the result of the analysis, the analysis status, and an error if any.
+// startAnalysis performs the analysis of a project and generates an SBOM (Software Bill of Materials).
+// It takes the analysis configuration, downloads the sample, executes the plugin, and stores the results.
+// Parameters:
+//
+//	args: Arguments containing the database connection.
+//	dispatcherMessage: Message from the dispatcher containing analysis details.
+//	config: Plugin configuration.
+//	analysis_document: Analysis document containing the analysis configuration.
+//
+// Returns:
+//
+//	A map containing the analysis result, the analysis status, and any error encountered.
 func startAnalysis(args Arguments, dispatcherMessage types_amqp.DispatcherPluginMessage, config plugin_db.Plugin, analysis_document codeclarity.Analysis) (map[string]any, codeclarity.AnalysisStatus, error) {
 
-	// Get analysis config
+	// Retrieve analysis configuration from the analysis document.
 	messageData := analysis_document.Config[config.Name].(map[string]any)
 
-	// GET download path from ENV
+	// Retrieve the download path from the environment variables.
 	path := os.Getenv("DOWNLOAD_PATH")
 
-	// Destination folder
-	// destination := fmt.Sprintf("%s/%s/%s", path, organization, analysis.Commit)
-	// Prepare the arguments for the plugin
+	// Construct the destination folder path.
 	sample := filepath.Join(path, dispatcherMessage.OrganizationId.String(), "samples", messageData["sample"].(string))
 
-	// Start the plugin
+	// Execute the plugin with the sample and database connection.
 	rOutput := plugin.Start(sample, args.codeclarity, messageData["platform"].(string))
 
+	// Create a result object to store the analysis result in the database.
 	result := codeclarity.Result{
 		Result:     rOutput,
 		AnalysisId: dispatcherMessage.AnalysisId,
 		Plugin:     config.Name,
 	}
+
+	// Insert the result into the database.
 	_, err := args.codeclarity.NewInsert().Model(&result).Exec(context.Background())
 	if err != nil {
-		panic(err)
+		return nil, codeclarity.FAILURE, fmt.Errorf("error inserting result into database: %w", err)
 	}
 
-	// Prepare the result to store in step
-	// In this case we only store the sbomKey
-	// The other plugins will use this key to get the sbom
+	// Prepare the result map to store the sbom key.
 	res := make(map[string]any)
 	res["rKey"] = result.Id
 
-	// The output is always a map[string]any
+	// Return the result map, analysis status, and nil error.
 	return res, rOutput.AnalysisInfo.Status, nil
 }
