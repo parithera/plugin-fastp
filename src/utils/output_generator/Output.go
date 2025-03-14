@@ -8,21 +8,22 @@ import (
 	exceptionManager "github.com/CodeClarityCE/utility-types/exceptions"
 )
 
-// getAnalysisTiming calculates the start time, end time, and elapsed time of the analysis.
-// It takes the start time as a parameter and returns the start time, end time, and elapsed time in seconds.
-func GetAnalysisTiming(start time.Time) (string, string, float64) {
-	end := time.Now()
-	elapsed := time.Since(start)
-	return start.Local().String(), end.Local().String(), elapsed.Seconds()
+// GetAnalysisTiming calculates the analysis start time, end time, and duration.
+// It takes the analysis start time as input and returns the formatted start time,
+// formatted end time, and the duration in seconds.
+func GetAnalysisTiming(startTime time.Time) (string, string, float64) {
+	endTime := time.Now()
+	elapsed := endTime.Sub(startTime)
+	return startTime.Local().String(), endTime.Local().String(), elapsed.Seconds()
 }
 
-// writeFailureOutput writes the failure output for the analysis.
-// It sets the status of the output to analysis.FAILURE and updates the analysis timing information.
-// It also retrieves and sets the private and public errors from the exception manager.
-// The updated output is then returned.
-func WriteFailureOutput(output sbomTypes.Output, start time.Time) sbomTypes.Output {
+// WriteFailureOutput constructs a failure output for the analysis.
+// It sets the analysis status to FAILURE, records the analysis timing,
+// and includes any collected errors in the output.
+// It takes the current output and the analysis start time as input and returns the updated output.
+func WriteFailureOutput(output sbomTypes.Output, startTime time.Time) sbomTypes.Output {
 	output.AnalysisInfo.Status = codeclarity.FAILURE
-	formattedStart, formattedEnd, delta := GetAnalysisTiming(start)
+	formattedStart, formattedEnd, delta := GetAnalysisTiming(startTime)
 	output.AnalysisInfo.Time.AnalysisStartTime = formattedStart
 	output.AnalysisInfo.Time.AnalysisEndTime = formattedEnd
 	output.AnalysisInfo.Time.AnalysisDeltaTime = delta
